@@ -14,8 +14,78 @@ for i in range(42):
     player_type.append('AI: alpha-beta level '+str(i+1))
 
 def alpha_beta_decision(board, turn, ai_level, queue, max_player):
-    # random move (to modify)
-    queue.put(board.get_possible_moves()[rnd.randint(0, len(board.get_possible_moves()) - 1)])
+    possible_moves = board.get_possible_moves()
+    best_move = possible_moves[0]
+    best_value = -2
+    alpha = -2
+    beta = 2
+    for move in possible_moves:
+        updated_board = board.copy()
+        updated_board.add_disk(move, max_player, update_display=False)
+        value = min_value_ab(updated_board, turn + 1, alpha, beta, ai_level, max_player)
+        if value > best_value:
+            best_value = value
+            best_move = move
+    queue.put(best_move)
+
+def max_value_ab(board, turn, alpha, beta, ai_level, max_player):
+    if board.check_victory():
+        return -1
+    if turn >= ai_level * 2:
+        return 0
+    possible_moves = board.get_possible_moves()
+    value = -2
+    for move in possible_moves:
+        updated_board = board.copy()
+        updated_board.add_disk(move, 3 - max_player, update_display=False)
+        value = max(value, min_value_ab(updated_board, turn + 1, alpha, beta, ai_level, max_player))
+        if value >= beta:
+            return value
+        alpha = max(alpha, value)
+    return value
+
+def min_value_ab(board, turn, alpha, beta, ai_level, max_player):
+    if board.check_victory():
+        return 1
+    if turn >= ai_level * 2:
+        return 0
+    possible_moves = board.get_possible_moves()
+    value = 2
+    for move in possible_moves:
+        updated_board = board.copy()
+        updated_board.add_disk(move, max_player, update_display=False)
+        value = min(value, max_value_ab(updated_board, turn + 1, alpha, beta, ai_level, max_player))
+        if value <= alpha:
+            return value
+        beta = min(beta, value)
+    return value
+
+def max_value(board, turn, ai_level, max_player):
+    if board.check_victory():
+        return -1
+    if turn >= ai_level * 2:
+        return 0
+    possible_moves = board.get_possible_moves()
+    value = -2
+    for move in possible_moves:
+        updated_board = board.copy()
+        updated_board.add_disk(move, 3 - max_player, update_display=False)
+        value = max(value, min_value(updated_board, turn + 1, ai_level, max_player))
+    return value
+
+def min_value(board, turn, ai_level, max_player):
+    if board.check_victory():
+        return 1
+    if turn >= ai_level * 2:
+        return 0
+    possible_moves = board.get_possible_moves()
+    value = 2
+    for move in possible_moves:
+        updated_board = board.copy()
+        updated_board.add_disk(move, max_player, update_display=False)
+        value = min(value, max_value(updated_board, turn + 1, ai_level, max_player))
+    return value
+
 
 class Board:
     grid = np.array([[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0],
@@ -23,6 +93,7 @@ class Board:
 
 
     def eval(self, player):
+
         return 0
 
     def copy(self):
