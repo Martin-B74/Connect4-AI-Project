@@ -67,7 +67,7 @@ def minimax_decision(board, turn, queue):
             best_move = move
     queue.put(best_move)
 
-def max_value(board, turn):
+def max_value(board, turn): # IA is playing
     if board.check_victory(update_display=False):
         return -1
     if turn > 9:
@@ -82,7 +82,7 @@ def max_value(board, turn):
             best_value = value
     return best_value
 
-def min_value(board, turn):
+def min_value(board, turn): # User is playing
     if board.check_victory(update_display=False):
         return 1
     if turn > 9:

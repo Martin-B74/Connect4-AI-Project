@@ -5,7 +5,6 @@ import random as rnd
 from threading import Thread
 from queue import Queue
 
-
 disk_color = ['white', 'red', 'orange']
 disks = list()
 
@@ -30,9 +29,9 @@ def alpha_beta_decision(board, turn, ai_level, queue, max_player):
 
 def max_value_ab(board, turn, alpha, beta, ai_level, max_player):
     if board.check_victory():
-        return -1
+        return -100000
     if turn >= ai_level * 2:
-        return 0
+        return board.eval(max_player)
     possible_moves = board.get_possible_moves()
     value = -2
     for move in possible_moves:
@@ -46,9 +45,9 @@ def max_value_ab(board, turn, alpha, beta, ai_level, max_player):
 
 def min_value_ab(board, turn, alpha, beta, ai_level, max_player):
     if board.check_victory():
-        return 1
+        return +100000
     if turn >= ai_level * 2:
-        return 0
+        return board.eval(max_player)
     possible_moves = board.get_possible_moves()
     value = 2
     for move in possible_moves:
@@ -60,41 +59,124 @@ def min_value_ab(board, turn, alpha, beta, ai_level, max_player):
         beta = min(beta, value)
     return value
 
-def max_value(board, turn, ai_level, max_player):
-    if board.check_victory():
-        return -1
-    if turn >= ai_level * 2:
-        return 0
-    possible_moves = board.get_possible_moves()
-    value = -2
-    for move in possible_moves:
-        updated_board = board.copy()
-        updated_board.add_disk(move, 3 - max_player, update_display=False)
-        value = max(value, min_value(updated_board, turn + 1, ai_level, max_player))
-    return value
-
-def min_value(board, turn, ai_level, max_player):
-    if board.check_victory():
-        return 1
-    if turn >= ai_level * 2:
-        return 0
-    possible_moves = board.get_possible_moves()
-    value = 2
-    for move in possible_moves:
-        updated_board = board.copy()
-        updated_board.add_disk(move, max_player, update_display=False)
-        value = min(value, max_value(updated_board, turn + 1, ai_level, max_player))
-    return value
-
-
 class Board:
-    grid = np.array([[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0],
+    def __init__(self):
+        self.grid = np.array([[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0],
                      [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]])
 
+    def eval_window(self, window, player, opponent):
+        nb_player = window.count(player)
+        nb_opponent = window.count(opponent)
+        nb_empty = window.count(0)
 
-    def eval(self, player):
+        if nb_player > 0 and nb_opponent > 0:
+            return 0
+
+        if nb_player == 3 and nb_empty == 1:
+            return +100
+        if nb_player == 2 and nb_empty == 2:
+            return +10
+        if nb_player == 1 and nb_empty == 3:
+            return +1
+
+        if nb_opponent == 3 and nb_empty == 1:
+            return -100
+        if nb_opponent == 2 and nb_empty == 2:
+            return -10
+        if nb_opponent == 1 and nb_empty == 3:
+            return -1
 
         return 0
+
+    def eval(self, player):
+        if player == 1:
+            opponent = 2
+        else:
+            opponent = 1
+        score = 0
+
+        # Horizontal alignment check ff
+        for line in range(6):
+                for horizontal_shift in range(4):
+                    window = [self.grid[horizontal_shift][line],
+                              self.grid[horizontal_shift + 1][line],
+                              self.grid[horizontal_shift + 2][line],
+                              self.grid[horizontal_shift + 3][line]]
+                    if window == [player, player, player, player]:
+                        return +100000
+                    if window == [opponent, opponent, opponent, opponent]:
+                        return -100000
+
+        # Vertical alignment check
+        for column in range(7):
+                for line in range(3):
+                    window = [self.grid[column][line],
+                              self.grid[column][line + 1],
+                              self.grid[column][line + 2],
+                              self.grid[column][line + 3]]
+                    if window == [player, player, player, player]:
+                        return +100000
+                    if window == [opponent, opponent, opponent, opponent]:
+                        return -100000
+
+        # Diagonal alignment check
+        for column in range(4):
+                for line in range(3):
+                    window = [self.grid[column][line],
+                              self.grid[column + 1][line + 1],
+                              self.grid[column + 2][line + 2],
+                              self.grid[column + 3][line + 3]]
+                    if window == [player, player, player, player]:
+                        return +100000
+                    if window == [opponent, opponent, opponent, opponent]:
+                        return -100000
+        for column in range(4):
+                for line in range(3, 6):
+                    window = [self.grid[column][line],
+                              self.grid[column + 1][line - 1],
+                              self.grid[column + 2][line - 2],
+                              self.grid[column + 3][line - 3]]
+                    if window == [player, player, player, player]:
+                        return +100000
+                    if window == [opponent, opponent, opponent, opponent]:
+                        return -100000
+
+        # Scoring Horizontal
+        for line in range(6):
+            for horizontal_shift in range(4):
+                window = [self.grid[horizontal_shift][line],
+                          self.grid[horizontal_shift + 1][line],
+                          self.grid[horizontal_shift + 2][line],
+                          self.grid[horizontal_shift + 3][line]]
+                score += self.eval_window(window, player, opponent)
+
+        # Scoring Vertical
+        for column in range(7):
+            for line in range(3):
+                window = [self.grid[column][line],
+                          self.grid[column][line + 1],
+                          self.grid[column][line + 2],
+                          self.grid[column][line + 3]]
+                score += self.eval_window(window, player, opponent)
+
+        # Scoring Diagonal
+        for column in range(4):
+            for line in range(3):
+                window = [self.grid[column][line],
+                          self.grid[column + 1][line + 1],
+                          self.grid[column + 2][line + 2],
+                          self.grid[column + 3][line + 3]]
+                score += self.eval_window(window, player, opponent)
+
+        for column in range(4):
+            for line in range(3, 6):
+                window = [self.grid[column][line],
+                          self.grid[column + 1][line - 1],
+                          self.grid[column + 2][line - 2],
+                          self.grid[column + 3][line - 3]]
+                score += self.eval_window(window, player, opponent)
+
+        return score
 
     def copy(self):
         new_board = Board()
