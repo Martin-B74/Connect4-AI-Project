@@ -5,6 +5,7 @@ import random as rnd
 from threading import Thread
 from queue import Queue
 
+
 disk_color = ['white', 'red', 'orange']
 disks = list()
 
@@ -13,168 +14,125 @@ for i in range(42):
     player_type.append('AI: alpha-beta level '+str(i+1))
 
 def alpha_beta_decision(board, turn, ai_level, queue, max_player):
+    best_move = -1
+    alpha = -float('inf')
+    beta = float('inf')
+    best_value = -float('inf')
+    
     possible_moves = board.get_possible_moves()
-    best_move = possible_moves[0]
-    best_value = -2
-    alpha = -2
-    beta = 2
-    for move in possible_moves:
-        updated_board = board.copy()
-        updated_board.add_disk(move, max_player, update_display=False)
-        value = min_value_ab(updated_board, turn + 1, alpha, beta, ai_level, max_player)
+    
+    for col in possible_moves:
+        temp_board = board.copy()
+        temp_board.add_disk(col, max_player, update_display=False)
+        
+        value = min_value_ab(temp_board, turn + 1, alpha, beta, ai_level - 1, max_player)
+        
         if value > best_value:
             best_value = value
-            best_move = move
+            best_move = col
+        alpha = max(alpha, value)
+
     queue.put(best_move)
 
-def max_value_ab(board, turn, alpha, beta, ai_level, max_player):
+def max_value_ab(board, turn, alpha, beta, depth, max_player):
     if board.check_victory():
-        return -100000
-    if turn >= ai_level * 2:
+        return -10000 # Défaite du joueur max
+    if depth == 0 or turn >= 42:
         return board.eval(max_player)
-    possible_moves = board.get_possible_moves()
-    value = -2
-    for move in possible_moves:
-        updated_board = board.copy()
-        updated_board.add_disk(move, 3 - max_player, update_display=False)
-        value = max(value, min_value_ab(updated_board, turn + 1, alpha, beta, ai_level, max_player))
+    
+    value = -float('inf')
+
+    for col in board.get_possible_moves():
+        temp_board = board.copy()
+        temp_board.add_disk(col, max_player, update_display=False)
+        value = max(value, min_value_ab(temp_board, turn + 1, alpha, beta, depth - 1, max_player))
         if value >= beta:
             return value
         alpha = max(alpha, value)
+    
     return value
 
-def min_value_ab(board, turn, alpha, beta, ai_level, max_player):
+def min_value_ab(board, turn, alpha, beta, depth, max_player):
+    opponent = 1 if max_player == 2 else 2
+
     if board.check_victory():
-        return +100000
-    if turn >= ai_level * 2:
+        return 10000 # Victoire du joueur max
+    if depth == 0 or turn >= 42:
         return board.eval(max_player)
-    possible_moves = board.get_possible_moves()
-    value = 2
-    for move in possible_moves:
-        updated_board = board.copy()
-        updated_board.add_disk(move, max_player, update_display=False)
-        value = min(value, max_value_ab(updated_board, turn + 1, alpha, beta, ai_level, max_player))
+    
+    value = float('inf')
+
+    for col in board.get_possible_moves():
+        temp_board = board.copy()
+        temp_board.add_disk(col, opponent, update_display=False)
+        value = min(value, max_value_ab(temp_board, turn + 1, alpha, beta, depth - 1, max_player))
         if value <= alpha:
             return value
         beta = min(beta, value)
+    
     return value
 
 class Board:
-    def __init__(self):
-        self.grid = np.array([[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0],
+    grid = np.array([[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0],
                      [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]])
 
-    def eval_window(self, window, player, opponent):
-        nb_player = window.count(player)
-        nb_opponent = window.count(opponent)
-        nb_empty = window.count(0)
-
-        if nb_player > 0 and nb_opponent > 0:
-            return 0
-
-        if nb_player == 3 and nb_empty == 1:
-            return +100
-        if nb_player == 2 and nb_empty == 2:
-            return +10
-        if nb_player == 1 and nb_empty == 3:
-            return +1
-
-        if nb_opponent == 3 and nb_empty == 1:
-            return -100
-        if nb_opponent == 2 and nb_empty == 2:
-            return -10
-        if nb_opponent == 1 and nb_empty == 3:
-            return -1
-
-        return 0
 
     def eval(self, player):
-        if player == 1:
-            opponent = 2
-        else:
-            opponent = 1
+        opponent = 1 if player == 2 else 2
         score = 0
+        
+        # Biai pour le controle du centre
+        center_array = self.grid[3, :]
+        center_count = np.count_nonzero(center_array == player)
+        score += center_count * 3
 
-        # Horizontal alignment check ff
-        for line in range(6):
-                for horizontal_shift in range(4):
-                    window = [self.grid[horizontal_shift][line],
-                              self.grid[horizontal_shift + 1][line],
-                              self.grid[horizontal_shift + 2][line],
-                              self.grid[horizontal_shift + 3][line]]
-                    if window == [player, player, player, player]:
-                        return +100000
-                    if window == [opponent, opponent, opponent, opponent]:
-                        return -100000
+        def evaluate_window(window, p):
+            window_score = 0
+            opp = 1 if p == 2 else 2
+            
+            # Comptage des pions dans la fenêtre de 4
+            p_count = np.count_nonzero(window == p)
+            empty_count = np.count_nonzero(window == 0)
+            opp_count = np.count_nonzero(window == opp)
 
-        # Vertical alignment check
-        for column in range(7):
-                for line in range(3):
-                    window = [self.grid[column][line],
-                              self.grid[column][line + 1],
-                              self.grid[column][line + 2],
-                              self.grid[column][line + 3]]
-                    if window == [player, player, player, player]:
-                        return +100000
-                    if window == [opponent, opponent, opponent, opponent]:
-                        return -100000
+            if p_count == 4:
+                window_score += 1000
+            elif p_count == 3 and empty_count == 1:
+                window_score += 100
+            elif p_count == 2 and empty_count == 2:
+                window_score += 10
+                
+            # Bloquer l'adversaire en priorité
+            if opp_count == 3 and empty_count == 1:
+                window_score -= 100
+                
+            return window_score
 
-        # Diagonal alignment check
-        for column in range(4):
-                for line in range(3):
-                    window = [self.grid[column][line],
-                              self.grid[column + 1][line + 1],
-                              self.grid[column + 2][line + 2],
-                              self.grid[column + 3][line + 3]]
-                    if window == [player, player, player, player]:
-                        return +100000
-                    if window == [opponent, opponent, opponent, opponent]:
-                        return -100000
-        for column in range(4):
-                for line in range(3, 6):
-                    window = [self.grid[column][line],
-                              self.grid[column + 1][line - 1],
-                              self.grid[column + 2][line - 2],
-                              self.grid[column + 3][line - 3]]
-                    if window == [player, player, player, player]:
-                        return +100000
-                    if window == [opponent, opponent, opponent, opponent]:
-                        return -100000
+        # Analyse Horizontale
+        for r in range(6):
+            row_array = self.grid[:, r]
+            for c in range(4):
+                window = row_array[c:c+4]
+                score += evaluate_window(window, player)
 
-        # Scoring Horizontal
-        for line in range(6):
-            for horizontal_shift in range(4):
-                window = [self.grid[horizontal_shift][line],
-                          self.grid[horizontal_shift + 1][line],
-                          self.grid[horizontal_shift + 2][line],
-                          self.grid[horizontal_shift + 3][line]]
-                score += self.eval_window(window, player, opponent)
+        # Analyse Verticale
+        for c in range(7):
+            col_array = self.grid[c, :]
+            for r in range(3):
+                window = col_array[r:r+4]
+                score += evaluate_window(window, player)
 
-        # Scoring Vertical
-        for column in range(7):
-            for line in range(3):
-                window = [self.grid[column][line],
-                          self.grid[column][line + 1],
-                          self.grid[column][line + 2],
-                          self.grid[column][line + 3]]
-                score += self.eval_window(window, player, opponent)
+        # Analyse Diagonale positive
+        for r in range(3):
+            for c in range(4):
+                window = [self.grid[c+i][r+i] for i in range(4)]
+                score += evaluate_window(np.array(window), player)
 
-        # Scoring Diagonal
-        for column in range(4):
-            for line in range(3):
-                window = [self.grid[column][line],
-                          self.grid[column + 1][line + 1],
-                          self.grid[column + 2][line + 2],
-                          self.grid[column + 3][line + 3]]
-                score += self.eval_window(window, player, opponent)
-
-        for column in range(4):
-            for line in range(3, 6):
-                window = [self.grid[column][line],
-                          self.grid[column + 1][line - 1],
-                          self.grid[column + 2][line - 2],
-                          self.grid[column + 3][line - 3]]
-                score += self.eval_window(window, player, opponent)
+        # Analyse Diagonale négative
+        for r in range(3):
+            for c in range(4):
+                window = [self.grid[c+i][5-r-i] for i in range(4)]
+                score += evaluate_window(np.array(window), player)
 
         return score
 
